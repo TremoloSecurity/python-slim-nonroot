@@ -30,7 +30,7 @@ jobs:
           registry: ghcr.io
 
       - name: build
-        run: docker build --no-cache --tag=docker.io/tremolosecurity/python3
+        run: docker build --no-cache --tag=docker.io/tremolosecurity/python3 .
       
       - name: push to dockerhub
         run: docker push docker.io/tremolosecurity/python3
