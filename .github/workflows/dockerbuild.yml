@@ -5,6 +5,10 @@ on:
     branches:
       - 'main'
 
+permissions:
+  id-token: write
+  packages: write
+
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -28,6 +32,13 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
+
+      - name: generate tag
+        run: |-
+            export PROJ_VERSION="1.0.0"
+            echo "Project Version: $PROJ_VERSION"
+            echo "TAG=$PROJ_VERSION-$(echo $GITHUB_SHA | cut -c 1-6)" >> $GITHUB_ENV
+            echo "SHORT_TAG=$PROJ_VERSION" >> $GITHUB_ENV
           
       -
         name: Build and push
@@ -36,8 +47,40 @@ jobs:
         with:
           push: true
           tags: |
-            docker.io/tremolosecurity/python3
-            ghcr.io/tremolosecurity/python3
+            docker.io/tremolosecurity/python3:${{ env.TAG }}
+            docker.io/tremolosecurity/python3:${{ env.SHORT_TAG }}
+            docker.io/tremolosecurity/python3:latest
+            ghcr.io/tremolosecurity/python3:${{ env.TAG }}
+            ghcr.io/tremolosecurity/python3:${{ env.SHORT_TAG }}
+            ghcr.io/tremolosecurity/python3:latest
+
+      - name: sign images
+        run: |-
+          cosign sign -y docker.io/tremolosecurity/python3:${{ env.TAG }}
+          cosign sign -y ghcr.io/tremolosecurity/python3:${{ env.TAG }}
+    
+      - uses: anchore/sbom-action@v0
+        with:
+          image: docker.io/tremolosecurity/python3:${{ env.TAG }}
+          format: spdx
+          output-file: /tmp/spdxd
+
+      - uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/tremolosecurity/python3:${{ env.TAG }}
+          format: spdx
+          output-file: /tmp/spdxg
+
+      - name: attach sbom to images
+        run: |-
+          cosign attach sbom --sbom /tmp/spdxd docker.io/tremolosecurity/python3:${{ env.TAG }}
+          cosign attach sbom --sbom /tmp/spdxg ghcr.io/tremolosecurity/python3:${{ env.TAG }}
+
+          DH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' docker.io/tremolosecurity/python3:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
+          GH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' ghcr.io/tremolosecurity/python3:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
+
+          cosign sign -y docker.io/tremolosecurity/python3:sha256-$DH_SBOM_SHA.sbom
+          cosign sign -y ghcr.io/tremolosecurity/python3:sha256-$GH_SBOM_SHA.sbom
 
       
 
