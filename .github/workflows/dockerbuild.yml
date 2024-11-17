@@ -9,7 +9,7 @@ permissions:
   id-token: write
   packages: write
 
-  
+
 jobs:
   docker:
     runs-on: ubuntu-latest
@@ -79,7 +79,7 @@ jobs:
       - name: attach sbom to images
         run: |-
           cosign attach sbom --sbom /tmp/spdxg ghcr.io/${{ env.REPO }}/python3:${{ env.TAG }}
-          GH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' ghcr.io/tremolosecurity/python3:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
+          GH_SBOM_SHA=$(cosign verify --certificate-oidc-issuer-regexp='.*' --certificate-identity-regexp='.*' ghcr.io/${{ env.REPO }}/python3:${{ env.TAG }} 2>/dev/null | jq -r '.[0].critical.image["docker-manifest-digest"]' | cut -c 8-)
           cosign sign -y ghcr.io/${{ env.REPO }}/python3:sha256-$GH_SBOM_SHA.sbom
 
       
